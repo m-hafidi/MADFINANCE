@@ -35,5 +35,5 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
-    "live: tests that hit live network sources (deselect with -m 'not live')",
+    "live: tests that hit live network sources (run with: pytest --live)",
 ]

@@ -157,6 +157,9 @@ def get_intraday_bars(symbol: str) -> pd.DataFrame:
         } | {"_ts": pd.to_datetime(ts, unit="ms")})
     df = pd.DataFrame.from_records(records)
     df = df.set_index("_ts").sort_index()
+    # quote snapshots can repeat a timestamp (pre-open/continuous updates):
+    # keep the last value for each instant
+    df = df[~df.index.duplicated(keep="last")]
     df.index.name = "Datetime"
     _cache.set_df(key, df)
     return df
