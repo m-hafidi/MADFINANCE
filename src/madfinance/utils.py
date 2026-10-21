@@ -15,20 +15,31 @@ from pathlib import Path
 from typing import Optional, Union
 
 _THOUSAND_SEPARATORS = "\u00a0\u202f \u2009"  # space, NBSP, narrow NBSP, thin space
-_NUMBER_RE = re.compile(r"^[\s\u00a0\u202f]*-?[\d\u00a0\u202f ]*(?:,\d+)?")
+#: digits grouped by spaces/NBSPs (``80 490 370 000,00``), comma or dot decimals
+_SPACED_RE = rf"[\d{_THOUSAND_SEPARATORS}]+(?:[.,]\d+)?"
+#: digits grouped by dots (``1.234.567``), optional comma decimals
+_DOTTED_RE = r"\d{1,3}(?:\.\d{3})+(?:,\d+)?"
+_NUMBER_RE = re.compile(rf"[\s{_THOUSAND_SEPARATORS}]*-?(?:{_DOTTED_RE}|{_SPACED_RE})")
+_DOTTED_THOUSANDS_RE = re.compile(rf"-?{_DOTTED_RE}")
 
 
 def parse_fr_number(value) -> Optional[float]:
     """Parse a French-formatted number into a float.
 
-    Handles thousand separators (spaces/NBSPs), comma decimals and a trailing
-    ``%``. Returns ``None`` for empty cells, dashes and non-numeric text
-    such as ``"Oui"``.
+    Handles thousand separators (spaces/NBSPs or dots), comma or dot
+    decimals and a trailing ``%``. A 3-digit dotted group is thousands
+    (``1.234`` -> 1234, ``1.234,5`` -> 1234.5); any other single dot is
+    a decimal (``3.5`` -> 3.5). Returns ``None`` for empty cells, dashes
+    and non-numeric text such as ``"Oui"``.
 
     >>> parse_fr_number("80 490 370 000,00")
     80490370000.0
     >>> parse_fr_number("3,01%")
     3.01
+    >>> parse_fr_number("1.234,5")
+    1234.5
+    >>> parse_fr_number("1.234.567")
+    1234567.0
     >>> parse_fr_number("Aucun") is None
     True
     """
@@ -42,11 +53,21 @@ def parse_fr_number(value) -> Optional[float]:
     match = _NUMBER_RE.match(text)
     if not match:
         return None
-    token = match.group(0)
+    return _to_float(match.group(0))
+
+
+def _to_float(token: str) -> Optional[float]:
+    """Normalize the separator style of a matched numeric token."""
     for sep in _THOUSAND_SEPARATORS:
         token = token.replace(sep, "")
-    token = token.replace(" ", "").replace(",", ".")
-    if not token or token == "-":
+    if _DOTTED_THOUSANDS_RE.fullmatch(token):  # "1.234", "-1.234,5"
+        token = token.replace(".", "").replace(",", ".")
+    elif "," in token and "." in token:         # mixed separators
+        token = token.replace(".", "").replace(",", ".")
+    elif "," in token:                          # "12,5" — FR comma decimal
+        token = token.replace(",", ".")
+    # a remaining single "." is already a decimal ("3.5")
+    if not token or token in {"-", "+", "."}:
         return None
     try:
         return float(token)

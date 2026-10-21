@@ -398,7 +398,10 @@ def _section_pages(start: int, kind: str, texts: List[str], doc) -> list:
     pages = [doc.pages[start]]
     for j in range(start + 1, min(start + _MAX_SECTION_PAGES, len(texts))):
         page_text = texts[j]
-        if not _PAGE_DATE_RE.search(_fold(page_text)):
+        # folded matches "31 decembre 2025"; raw matches slash dates "31/12/2025"
+        # which folding collapses into "31 12 2025" (no separators left)
+        if not (_PAGE_DATE_RE.search(_fold(page_text))
+                or _PAGE_DATE_RE.search(page_text)):
             break                       # dates mark statement tables
         real_kinds = {k for k in (_section_on_line(line)
                                   for line in page_text.splitlines()) if k}
@@ -697,15 +700,11 @@ def _strip_marker(label: str) -> Tuple[str, bool]:
 
 
 def _parse_num(cell: str) -> Optional[float]:
-    """Numeric cell in French format; ``(...)`` is negative, ``.`` thousands."""
+    """Numeric cell in French format; ``(...)`` is negative, dot/space thousands."""
     text = cell.strip()
     paren = text.startswith("(") and text.endswith(")")
     if paren:
         text = text[1:-1].strip()
-    if text.count(".") >= 2:
-        text = text.replace(".", "")       # 1.234.567 — dotted thousands
-    elif "." in text:
-        text = text.replace(".", ",")      # decimal dot -> FR comma
     value = parse_fr_number(text)
     if value is not None and paren:
         value = -value

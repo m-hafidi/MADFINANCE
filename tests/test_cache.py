@@ -55,6 +55,22 @@ def test_df_roundtrip(tmp_path, monkeypatch):
     assert out.index.name == "Date"
 
 
+def test_df_roundtrip_intraday_times(tmp_path, monkeypatch):
+    # intraday bars must keep their time-of-day: truncating to the date would
+    # collapse every bar onto midnight on the next read (all duplicates)
+    cache = make_cache(tmp_path, monkeypatch)
+    idx = pd.to_datetime(["2026-01-05 09:05:00", "2026-01-05 09:10:00",
+                          "2026-01-05 15:30:00"])
+    df = pd.DataFrame({"Close": [100.0, 101.0, 102.0]},
+                      index=pd.DatetimeIndex(idx, name="Datetime"))
+    cache.set_df("intraday:ATW", df)
+    out = cache.get_df("intraday:ATW", ttl=60)
+    assert out is not None
+    assert list(out.index) == list(idx)
+    assert not out.index.duplicated().any()
+    assert out.index.name == "Datetime"
+
+
 def test_df_roundtrip_legacy_meta(tmp_path, monkeypatch):
     # entries written before the index-name metadata existed still load
     cache = make_cache(tmp_path, monkeypatch)

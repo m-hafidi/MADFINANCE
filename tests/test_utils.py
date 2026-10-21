@@ -26,6 +26,14 @@ class TestParseFrNumber:
         ("0", 0.0),
         (42, 42.0),
         (3.5, 3.5),
+        # dot handling: 3-digit dotted groups are thousands, anything else
+        # is a decimal (the old regex silently truncated at every dot)
+        ("3.5", 3.5),
+        ("1.234,5", 1234.5),
+        ("-1.234,5", -1234.5),
+        ("1.234.567", 1234567.0),
+        ("1.234", 1234.0),
+        ("1234.50", 1234.5),
     ])
     def test_values(self, text, expected):
         assert parse_fr_number(text) == expected

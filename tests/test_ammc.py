@@ -1,6 +1,8 @@
 """Offline tests for the AMMC pure helpers: folding, title detection, column
 anchors and French value parsing. No network, no PDFs."""
 
+from types import SimpleNamespace
+
 import pytest
 
 from madfinance import ammc
@@ -41,6 +43,7 @@ class TestParseNum:
         ("(1 234)", -1234.0),
         ("(12,5)", -12.5),
         ("1.234.567", 1234567.0),   # dotted thousands
+        ("1.234,5", 1234.5),        # dotted thousands + comma decimals
         ("1.5", 1.5),               # decimal dot
         ("12,5", 12.5),             # FR comma
         ("-9 832 500", -9832500.0),
@@ -119,6 +122,37 @@ class TestTitleScore:
     ])
     def test_scores(self, line, score):
         assert ammc._title_score(line) == score
+
+
+class TestSectionPages:
+    def _doc(self, n):
+        """Fake pdfplumber document: .pages[i] is just the page index."""
+        return SimpleNamespace(pages=list(range(n)))
+
+    def test_slash_dated_continuation_included(self):
+        # continuation pages carry slash dates (31/12/2025), which folding
+        # collapses to "31 12 2025" — the raw text must be searched too
+        texts = [
+            "Compte de résultat consolidé au 31/12/2025 (en milliers de dirhams)",
+            "Autres charges d'exploitation 31/12/2025 31/12/2024\nTotal 1 234",
+            "Page sans dates de tableau",           # no table dates -> stop
+        ]
+        assert ammc._section_pages(0, "income", texts, self._doc(3)) == [0, 1]
+
+    def test_month_named_continuation_still_included(self):
+        texts = [
+            "Compte de résultat consolidé au 31 décembre 2025",
+            "Suite des charges 31 décembre 2025 31 décembre 2024",
+        ]
+        assert ammc._section_pages(0, "income", texts, self._doc(2)) == [0, 1]
+
+    def test_other_statement_breaks_span(self):
+        texts = [
+            "Compte de résultat consolidé au 31 décembre 2025",
+            "Suite 31 décembre 2025 31 décembre 2024",
+            "Bilan consolidé au 31 décembre 2025 (en milliers de dirhams)",
+        ]
+        assert ammc._section_pages(0, "income", texts, self._doc(3)) == [0, 1]
 
 
 class TestLocateSections:

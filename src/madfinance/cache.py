@@ -82,7 +82,15 @@ class Cache:
     def set_df(self, key: str, df: pd.DataFrame) -> None:
         # Dates stay naive (Moroccan trading days are plain calendar dates).
         out = df.copy()
-        out.index = pd.Index([str(i)[:10] for i in out.index], name=df.index.name)
+        if not isinstance(out.index, pd.DatetimeIndex):
+            out.index = pd.Index([str(i) for i in out.index], name=df.index.name)
+        elif (out.index.normalize() != out.index).any():
+            # intraday bars: keep the time-of-day (truncating to the date
+            # would collapse every bar onto midnight on the next read)
+            out.index = pd.Index([str(i) for i in out.index], name=df.index.name)
+        else:
+            out.index = pd.Index([str(i)[:10] for i in out.index],
+                                 name=df.index.name)
         self.set_json(key, out.to_json(orient="split", date_format="iso"))
         try:
             _, meta = self._paths(key)
