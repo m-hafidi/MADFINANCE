@@ -72,6 +72,9 @@ class Cache:
             # pandas >= 2.1 treats bare strings as file paths — pass a buffer.
             df = pd.read_json(io.StringIO(payload), orient="split", dtype=False)
             df.index = pd.to_datetime(df.index)
+            name = self._index_name(key)
+            if name is not None:
+                df.index.name = name          # split-orient JSON drops it
             return df
         except (ValueError, TypeError, OSError):
             return None
@@ -81,6 +84,20 @@ class Cache:
         out = df.copy()
         out.index = pd.Index([str(i)[:10] for i in out.index], name=df.index.name)
         self.set_json(key, out.to_json(orient="split", date_format="iso"))
+        try:
+            _, meta = self._paths(key)
+            meta.write_text(
+                json.dumps({"key": key, "index_name": df.index.name}),
+                encoding="utf-8")
+        except OSError:
+            pass
+
+    def _index_name(self, key: str) -> Optional[str]:
+        _, meta = self._paths(key)
+        try:
+            return json.loads(meta.read_text(encoding="utf-8")).get("index_name")
+        except (OSError, ValueError, AttributeError):
+            return None                      # legacy plain-key entry
 
     def clear(self) -> int:
         """Delete all entries; returns the number of files removed."""

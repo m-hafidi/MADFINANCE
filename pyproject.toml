@@ -27,7 +27,9 @@ pdf = ["pdfplumber>=0.10"]
 test = ["pytest>=7"]
 
 [project.urls]
-Homepage = "https://github.com/madfinance/madfinance"
+Homepage = "https://github.com/m-hafidi/MADFINANCE"
+Repository = "https://github.com/m-hafidi/MADFINANCE"
+Issues = "https://github.com/m-hafidi/MADFINANCE/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]

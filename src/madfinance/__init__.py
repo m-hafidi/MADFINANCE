@@ -10,6 +10,7 @@ and TradingView. Start with :class:`madfinance.Ticker` or
 >>> mf.download(["ATW", "IAM", "BCP"], period="6mo")
 """
 
+from . import ammc
 from ._exceptions import DependencyMissing, MadFinanceError, SourceError, SymbolNotFound
 from ._version import __version__
 from .market import clear_cache, download, market_summary, screener, tickers
@@ -22,6 +23,7 @@ MSI20 = Ticker("MSI20")
 __all__ = [
     "Ticker", "MASI", "MSI20",
     "download", "tickers", "market_summary", "screener", "clear_cache",
+    "ammc",
     "MadFinanceError", "SourceError", "SymbolNotFound", "DependencyMissing",
     "__version__",
 ]

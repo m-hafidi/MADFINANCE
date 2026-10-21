@@ -94,3 +94,39 @@ def test_symbol_resolution():
     assert mf.Ticker("MA0000011488").symbol == "IAM"
     with pytest.raises(mf.SymbolNotFound if hasattr(mf, "SymbolNotFound") else Exception):
         mf.Ticker("definitely not a company xyz").symbol
+
+
+# -- AMMC regulatory filings (primary statements from PDFs) ------------------
+
+def test_ammc_search_year():
+    df = mf.ammc.search(year=2025, symbol="ATW")
+    assert not df.empty
+    assert set(df.columns) == {"issuer", "year", "type", "url"}
+    assert (df["year"] == 2025).all()
+    assert df["url"].str.contains(
+        "/fr/espace-emetteurs/etats-financiers/").all()
+
+
+def test_ammc_statements_crosscheck():
+    stmts = mf.Ticker("ATW").statements(2025)
+    assert {"balance", "income", "cashflow"} <= set(stmts)
+
+    inc = stmts["income"]
+    assert inc.columns[0] == 2025          # newest year first
+    pnb = inc[inc.index.str.contains("PRODUIT NET BANCAIRE", case=False)]
+    assert not pnb.empty
+    assert pnb.iloc[0][2025] == pytest.approx(34_921_384)   # = official fiche
+
+    total = stmts["balance"]
+    total = total[total.index.str.contains("TOTAL PASSIF")]
+    assert not total.empty and total.iloc[0][2025] > 0
+
+    # no giant-number corruption from label/value column mixing
+    for frame in stmts.values():
+        assert not (frame.abs().max(axis=None) > 1e15)
+
+
+def test_ammc_scanned_pdf_raises():
+    # DARI's 2026 filing is an image-only scan: no text layer, OCR unsupported
+    with pytest.raises(mf.SourceError):
+        mf.Ticker("DARI").statements(2026)

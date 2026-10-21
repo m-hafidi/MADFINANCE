@@ -21,6 +21,7 @@ from typing import Dict, List, Optional, Union
 import pandas as pd
 
 from ._exceptions import MadFinanceError, SourceError
+from . import ammc
 from .sources import bourse, medias24, tradingview, tvdatafeed
 from .sources.bourse import _kv_key
 from .utils import parse_fr_bool, parse_fr_number, period_to_range
@@ -389,6 +390,19 @@ class Ticker:
         if not rows:
             raise SourceError(f"No cash-flow data for {self.symbol}")
         return _items_frame(rows, "Latest")
+
+    def statements(self, year: int, statement: Optional[str] = None):
+        """Statutory financial statements parsed from the AMMC PDF filing.
+
+        ``statement`` selects one table — ``"income"``, ``"balance"`` or
+        ``"cashflow"`` — otherwise a ``{statement: DataFrame}`` dict of every
+        statement found. Values are exactly as printed in the filing
+        (usually thousands of MAD). Requires the pdf extra:
+        ``pip install 'madfinance[pdf]'``.
+        """
+        if self.is_index:
+            raise SourceError("statements is only available for equities")
+        return ammc.statements(self.symbol, year, statement=statement)
 
     @property
     def dividends(self) -> pd.Series:
